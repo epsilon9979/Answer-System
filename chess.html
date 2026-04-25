@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>決戰西洋棋 - 專業對戰版 (標題右側)</title>
+    <style>
+        :root {
+            --sq-white: #ffffff;
+            --sq-black: #000000;
+            --hl-select: #888888;
+        }
+        body { 
+            font-family: "Microsoft JhengHei", sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            background: #e0e0e0; 
+            margin: 0; 
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 總容器：Flex 方向保持水平 */
+        .wrapper {
+            display: flex;
+            align-items: center;
+            padding: 30px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+        }
+
+        /* 遊戲主體區域 */
+        .main-game {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 420px;
+        }
+
+        /* 側邊標題：移至右側 (margin-left) */
+        .side-title {
+            writing-mode: horizontal-tb;
+            display: flex;
+            flex-direction: column;
+            font-size: 36px;
+            font-weight: 900;
+            color: #1a1a1a;
+            margin-left: 30px; /* 標題移到右邊，所以左邊留間距 */
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        .side-title span {
+            display: inline-block;
+            transform: rotate(90deg);
+        }
+
+        .info-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #fdfdfd; 
+            padding: 10px 15px; 
+            margin: 10px 0; 
+            border: 2px solid #333; 
+            border-radius: 4px; 
+            width: 100%;
+            height: 85px; 
+            box-sizing: border-box; 
+        }
+        
+        .info-black { transform: rotate(180deg); }
+        
+        #board { 
+            display: grid; 
+            grid-template-columns: repeat(8, 1fr); 
+            grid-template-rows: repeat(8, 50px); 
+            border: 4px solid #000; 
+            width: 400px;
+            height: 400px;
+            background: var(--sq-black); 
+            flex-shrink: 0;
+        }
+
+        .sq { 
+            width: 50px; 
+            height: 50px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: 40px; 
+            cursor: pointer; 
+            position: relative; 
+        }
+        .w { background: var(--sq-white); }
+        .b { background: var(--sq-black); }
+        .selected { background: var(--hl-select) !important; }
+        .hint::after { 
+            content: ''; 
+            width: 12px; 
+            height: 12px; 
+            background: rgba(128,128,128,0.5); 
+            border-radius: 50%; 
+            position: absolute; 
+        }
+        
+        .piece { z-index: 5; user-select: none; pointer-events: none; }
+        .piece.white { 
+            color: #fff; 
+            text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 1px 1px #000, -1px -1px #000; 
+        }
+        .piece.black { 
+            color: #000; 
+            text-shadow: 2px 0 #fff, -2px 0 #fff, 0 2px #fff, 0 -2px #fff, 1px 1px #fff, -1px -1px #fff; 
+            transform: rotate(180deg); 
+        }
+
+        .captured-zone { font-size: 24px; min-height: 28px; margin-top: 5px; }
+        .btns { display: flex; gap: 8px; }
+        button { 
+            cursor: pointer; 
+            padding: 6px 12px; 
+            border: 2px solid #000; 
+            background: #fff; 
+            font-weight: bold; 
+            border-radius: 0;
+            transition: 0.15s;
+        }
+        button:hover { background: #000; color: #fff; }
+        
+        #overlay { 
+            display: none; position: fixed; top:0; left:0; width:100%; height:100%; 
+            background:rgba(0,0,0,0.96); color:white; flex-direction:column; 
+            justify-content:center; align-items:center; z-index:100; 
+        }
+
+        @media (max-width: 550px) {
+            .wrapper { flex-direction: column-reverse; padding: 15px; }
+            .side-title { flex-direction: row; margin-left: 0; margin-top: 20px; }
+            .side-title span { transform: none; }
+            #board { width: 320px; height: 320px; grid-template-rows: repeat(8, 40px); }
+            .sq { width: 40px; height: 40px; font-size: 30px; }
+            .main-game { width: 320px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        <div class="main-game">
+            <div class="info-bar info-black">
+                <div><strong>黑方</strong><div id="cap-black" class="captured-zone"></div></div>
+                <div class="btns">
+                    <button onclick="undo()">悔棋</button>
+                    <button onclick="lose('black')">投降</button>
+                </div>
+            </div>
+
+            <div id="board"></div>
+
+            <div class="info-bar">
+                <div><strong>白方</strong><div id="cap-white" class="captured-zone"></div></div>
+                <div class="btns">
+                    <button onclick="undo()">悔棋</button>
+                    <button onclick="lose('white')">投降</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="side-title">
+            <span>決</span><span>戰</span><span>西</span><span>洋</span><span>棋</span>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="win-text"></h1>
+        <p style="font-size: 50px;">🏆✨♟️✨🏆</p>
+        <button onclick="location.reload()" style="font-size: 20px; padding: 15px 40px; border-color: #fff;">重新開始</button>
+    </div>
+
+    <script>
+        const SYMBOLS = {
+            white: {k:'♔', q:'♕', r:'♖', b:'♗', n:'♘', p:'♙'},
+            black: {k:'♚', q:'♛', r:'♜', b:'♝', n:'♞', p:'♟'}
+        };
+
+        let state = {
+            board: [],
+            turn: 'white',
+            sel: null,
+            cap: { white: [], black: [] },
+            moved: {} 
+        };
+        let history = [];
+
+        function init() {
+            const saved = localStorage.getItem('chess_v_final_right');
+            if (saved) {
+                try { state = JSON.parse(saved); } catch(e) { reset(); }
+            } else { reset(); }
+            render();
+        }
+
+        function reset() {
+            const layout = ['r','n','b','q','k','b','n','r'];
+            state.board = Array(8).fill(null).map(() => Array(8).fill(null));
+            for(let i=0; i<8; i++) {
+                state.board[0][i] = { t: layout[i], c: 'black', id: 'b'+i };
+                state.board[1][i] = { t: 'p', c: 'black', id: 'bp'+i };
+                state.board[6][i] = { t: 'p', c: 'white', id: 'wp'+i };
+                state.board[7][i] = { t: layout[i], c: 'white', id: 'w'+i };
+            }
+            state.turn = 'white';
+            state.cap = { white: [], black: [] };
+            state.moved = {};
+            state.sel = null;
+            save();
+        }
+
+        function render() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            const moves = state.sel ? getLegalMoves(state.sel.r, state.sel.c) : [];
+
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<8; c++) {
+                    const div = document.createElement('div');
+                    div.className = `sq ${(r+c)%2===0?'w':'b'}`;
+                    const p = state.board[r][c];
+                    if(p) {
+                        const span = document.createElement('span');
+                        span.className = `piece ${p.c}`;
+                        span.innerText = SYMBOLS[p.c][p.t];
+                        div.appendChild(span);
+                    }
+                    if(state.sel?.r===r && state.sel?.c===c) div.classList.add('selected');
+                    if(moves.some(m => m.r===r && m.c===c)) div.classList.add('hint');
+                    div.onclick = () => handleClick(r, c);
+                    boardEl.appendChild(div);
+                }
+            }
+            document.getElementById('cap-white').innerText = state.cap.white.map(x => SYMBOLS[x.c][x.t]).join('');
+            document.getElementById('cap-black').innerText = state.cap.black.map(x => SYMBOLS[x.c][x.t]).join('');
+        }
+
+        function handleClick(r, c) {
+            const p = state.board[r][c];
+            if(state.sel) {
+                const moves = getLegalMoves(state.sel.r, state.sel.c);
+                if(moves.some(m => m.r===r && m.c===c)) {
+                    executeMove(state.sel.r, state.sel.c, r, c);
+                    return;
+                }
+            }
+            if(p && p.c === state.turn) state.sel = {r, c};
+            else state.sel = null;
+            render();
+        }
+
+        function executeMove(fr, fc, tr, tc) {
+            history.push(JSON.stringify(state));
+            if(history.length > 30) history.shift();
+
+            const p = state.board[fr][fc];
+            const target = state.board[tr][tc];
+
+            if(p.t === 'k' && Math.abs(tc - fc) === 2) {
+                const rookC = tc > fc ? 7 : 0;
+                const nextRookC = tc > fc ? 5 : 3;
+                const rook = state.board[fr][rookC];
+                state.board[fr][nextRookC] = rook;
+                state.board[fr][rookC] = null;
+                state.moved[rook.id] = true;
+            }
+
+            if(target) state.cap[p.c].push(target);
+            state.board[tr][tc] = p;
+            state.board[fr][fc] = null;
+            state.moved[p.id] = true;
+
+            if(p.t==='p' && (tr===0 || tr===7)) p.t = 'q';
+
+            state.turn = state.turn==='white'?'black':'white';
+            state.sel = null;
+            save();
+            render();
+            checkWin();
+        }
+
+        function getLegalMoves(r, c) {
+            const p = state.board[r][c];
+            if(!p) return [];
+            let moves = [];
+            const d = p.c==='white'?-1:1;
+
+            if(p.t==='p') {
+                if(!state.board[r+d]?.[c]) {
+                    moves.push({r:r+d, c});
+                    if(((p.c==='white'&&r===6) || (p.c==='black'&&r===1)) && !state.board[r+d][c] && !state.board[r+2*d][c]) {
+                        moves.push({r:r+2*d, c});
+                    }
+                }
+                [c-1, c+1].forEach(nc => {
+                    const tar = state.board[r+d]?.[nc];
+                    if(tar && tar.c !== p.c) moves.push({r:r+d, c:nc});
+                });
+            } else {
+                const dirs = {
+                    'n': [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]],
+                    'r': [[1,0],[-1,0],[0,1],[0,-1]],
+                    'b': [[1,1],[1,-1],[-1,1],[-1,-1]],
+                    'q': [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],
+                    'k': [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+                }[p.t];
+                dirs.forEach(dr => {
+                    let nr = r+dr[0], nc = c+dr[1];
+                    while(nr>=0 && nr<8 && nc>=0 && nc<8) {
+                        const tar = state.board[nr][nc];
+                        if(!tar) moves.push({r:nr, c:nc});
+                        else {
+                            if(tar.c !== p.c) moves.push({r:nr, c:nc});
+                            break;
+                        }
+                        if(p.t==='k' || p.t==='n') break;
+                        nr+=dr[0]; nc+=dr[1];
+                    }
+                });
+                
+                if(p.t === 'k' && !state.moved[p.id]) {
+                    [0, 7].forEach(rookCol => {
+                        const rook = state.board[r][rookCol];
+                        if(rook && rook.t === 'r' && !state.moved[rook.id]) {
+                            const step = rookCol === 0 ? -1 : 1;
+                            let clear = true;
+                            for(let i = c + step; i !== rookCol; i += step) {
+                                if(state.board[r][i]) clear = false;
+                            }
+                            if(clear) moves.push({r, c: c + 2 * step});
+                        }
+                    });
+                }
+            }
+            return moves.filter(m => m.r >=0 && m.r < 8 && m.c >= 0 && m.c < 8);
+        }
+
+        function undo() {
+            if(history.length===0) return;
+            state = JSON.parse(history.pop());
+            render();
+            save();
+        }
+
+        function lose(who) { end(who==='white'?'黑方':'白方'); }
+
+        function checkWin() {
+            const all = state.board.flat();
+            if(!all.some(x => x?.t==='k' && x.c === 'white')) end('黑方');
+            else if(!all.some(x => x?.t==='k' && x.c === 'black')) end('白方');
+        }
+
+        function end(w) {
+            document.getElementById('overlay').style.display = 'flex';
+            document.getElementById('win-text').innerText = w + ' 獲得勝利！';
+            localStorage.removeItem('chess_v_final_right');
+        }
+
+        function save() { localStorage.setItem('chess_v_final_right', JSON.stringify(state)); }
+
+        init();
+    </script>
+</body>
+</html>
