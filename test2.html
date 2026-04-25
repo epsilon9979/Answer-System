@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>捷運車站資料測試</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; line-height: 1.6; }
+        .status { padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .station-id { color: #888; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <h2>捷運車站 API 測試專案</h2>
+    
+    <div id="status" class="status">正在嘗試連線到 API...</div>
+
+    <input type="text" id="searchInput" placeholder="輸入車站名稱（例如：台北車站）..." disabled>
+
+    <ul id="stationList"></ul>
+
+    <script>
+        const API_URL = 'https://tcgmetro.blob.core.windows.net/stationnames/stations.json';
+        const statusDiv = document.getElementById('status');
+        const searchInput = document.getElementById('searchInput');
+        const stationList = document.getElementById('stationList');
+        let allStations = [];
+
+        // 1. 抓取資料
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                
+                if (!response.ok) throw new Error(`連線失敗: ${response.status}`);
+                
+                const data = await response.json();
+                allStations = data; // 假設 API 回傳的是陣列
+
+                statusDiv.innerText = `成功載入 ${allStations.length} 筆資料！`;
+                statusDiv.className = 'status success';
+                searchInput.disabled = false;
+                
+                renderList(allStations);
+            } catch (err) {
+                statusDiv.innerText = `API 讀取錯誤: ${err.message} (可能是 CORS 限制或網址失效)`;
+                statusDiv.className = 'status error';
+                console.error(err);
+            }
+        }
+
+        // 2. 渲染列表
+        function renderList(list) {
+            stationList.innerHTML = list.map(s => `
+                <li>
+                    <span>${s.StationName?.Zh_tw || '未知名稱'}</span>
+                    <span class="station-id">${s.StationID || ''}</span>
+                </li>
+            `).join('');
+        }
+
+        // 3. 搜尋過濾功能
+        searchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const filtered = allStations.filter(s => 
+                s.StationName?.Zh_tw.includes(keyword) || 
+                s.StationID.toLowerCase().includes(keyword)
+            );
+            renderList(filtered);
+        });
+
+        // 執行
+        fetchData();
+    </script>
+</body>
+</html>
